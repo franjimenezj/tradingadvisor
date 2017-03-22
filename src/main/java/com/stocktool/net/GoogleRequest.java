@@ -16,9 +16,6 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/**
- * Created by fran on 28/2/17.
- */
 public class GoogleRequest {
 
     LocalDateTime timeStamp;
