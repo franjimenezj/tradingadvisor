@@ -18,7 +18,7 @@ public class CandleStickTest {
 
     @org.junit.Test
     public void isHammer() throws Exception {
-        assertTrue("dfadfa", candleStick.isHammer());
+        assertTrue("The candle does not fit into a hammer candlestick pattern", candleStick.isHammer());
     }
 
 }
