@@ -9,10 +9,10 @@ public class CandleStickTest {
     @org.junit.Before
     public void setUp() throws Exception {
         candleStick = CandleStick.CandleStickBuilder.aCandleStick()
-                .withOpen(99.0)
-                .withHigh(100.0)
-                .withLow(95.0)
-                .withClose(99.9)
+                .withOpen(145.36)
+                .withHigh(145.57)
+                .withLow(144.65)
+                .withClose(145.52)
                 .build();
     }
 

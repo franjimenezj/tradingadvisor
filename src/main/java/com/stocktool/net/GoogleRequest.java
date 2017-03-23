@@ -22,9 +22,9 @@ public class GoogleRequest {
     final Long INTERVAL = 1800L;
 
 
-    public void getData(String ticker) throws Exception {
+    public void getData(String ticker, String market) throws Exception {
 
-        URL url = new URL("https://www.google.com/finance/getprices?i="+INTERVAL+"&p=1d&f=d,o,h,l,c,v&df=cpct&q="+ticker);
+        URL url = new URL("https://www.google.com/finance/getprices?i="+INTERVAL+"&p=8d&f=d,o,h,l,c,v&df=cpct&q="+ticker+"&x="+market);
         URLConnection goog = url.openConnection();
         BufferedReader in = new BufferedReader(new InputStreamReader(goog.getInputStream()));
         Function<String, Long> mapToTimeStamp = (line) -> {
@@ -73,10 +73,12 @@ public class GoogleRequest {
     public static void main(String[]args) {
         GoogleRequest g = new GoogleRequest();
         try {
-            g.getData("NFLX");
-            g.getData("TSLA");
-            g.getData("SAN");
-            g.getData("TEF");
+            g.getData("NFLX", "NASD");
+            g.getData("TSLA", "NASD");
+            g.getData("CIEL3", "BVMF");
+            g.getData("SAN", "BME");
+            g.getData("TEF", "BME");
+            g.getData("EURUSD", "");
         } catch (Exception e) {
             e.printStackTrace();
         }

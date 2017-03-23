@@ -74,9 +74,9 @@ public class CandleStick {
         Double upperShadow = this.high-this.close;
         Double body = this.close-this.open;
 
-        if (height > open * 0.01 &&
-                upperShadow < height/20 &&
-                body < height*0.3) return true;
+        if (height > open * 0.005 &&
+                upperShadow < height/15 &&
+                body < height*0.20) return true;
         else return false;
 
     }
