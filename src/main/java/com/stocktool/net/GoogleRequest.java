@@ -4,6 +4,7 @@ import com.stocktool.model.CandleStick;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.DefaultAsyncHttpClient;
 import org.asynchttpclient.Response;
+import sun.invoke.empty.Empty;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -38,14 +39,14 @@ public class GoogleRequest {
 
     }
 
-    public void getDataHttpClient(String ticker, String market, Long interval, AsyncHttpClient asyncHttpClient) throws Exception {
+    public CompletableFuture<Void> getDataHttpClient(String ticker, String market, Long interval, AsyncHttpClient asyncHttpClient) throws Exception {
 
         CompletableFuture<Response> f = asyncHttpClient
                 .prepareGet("https://www.google.com/finance/getprices?i="+interval+"&p=4d&f=d,o,h,l,c,v&df=cpct&q="+ticker+"&x="+market)
                 .execute()
                 .toCompletableFuture();
 
-        f.thenAccept( response  -> {
+        return f.thenAccept( response  -> {
 
             BufferedReader in = new BufferedReader(new InputStreamReader(response.getResponseBodyAsStream()));
 
@@ -148,17 +149,26 @@ public class GoogleRequest {
 
             AsyncHttpClient asyncHttpClient = new DefaultAsyncHttpClient();
 
-            allStockList
+            List<CompletableFuture<Void>> futureList = allStockList
                     .stream()
-                    .forEach(pair -> {
-                        try {
-                            getDataHttpClient(pair.split(":")[1], pair.split(":")[0], INTERVAL_HOUR, asyncHttpClient);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
+                    .map(pair -> {
+                                try {
+                                    return getDataHttpClient(pair.split(":")[1],
+                                            pair.split(":")[0], INTERVAL_HOUR, asyncHttpClient);
+                                } catch (Exception e) {
+                                    return CompletableFuture.<Void>completedFuture(null);
+                                }
+                            }
+
+                    ).collect(Collectors.<CompletableFuture<Void>>toList());
+
+            final CompletableFuture <Void> voidCompletableFuture = CompletableFuture.allOf(futureList.toArray(new CompletableFuture[futureList.size()]))
+                    .thenAccept(v -> {
+                        futureList.forEach(CompletableFuture::join);
                     });
 
-            //asyncHttpClient.close();
+            Thread.sleep(1000);
+            asyncHttpClient.close();
 
         } catch (Exception e) {
             e.printStackTrace();
