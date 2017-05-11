@@ -162,12 +162,13 @@ public class GoogleRequest {
 
                     ).collect(Collectors.<CompletableFuture<Void>>toList());
 
-            final CompletableFuture <Void> voidCompletableFuture = CompletableFuture.allOf(futureList.toArray(new CompletableFuture[futureList.size()]))
+            final CompletableFuture <Void> allCompletableFuture = CompletableFuture.allOf(futureList.toArray(new CompletableFuture[futureList.size()]))
                     .thenAccept(v -> {
                         futureList.forEach(CompletableFuture::join);
                     });
 
-            Thread.sleep(1000);
+            allCompletableFuture.join();
+
             asyncHttpClient.close();
 
         } catch (Exception e) {
