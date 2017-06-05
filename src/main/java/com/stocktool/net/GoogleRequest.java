@@ -166,6 +166,7 @@ public class GoogleRequest {
 
             allCompletableFuture.join();
 
+            // close client
             asyncHttpClient.close();
 
         } catch (Exception e) {
