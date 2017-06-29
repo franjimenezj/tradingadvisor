@@ -10,6 +10,8 @@ public class CandleStick {
     public Double high;
     public LocalDateTime date;
     public Long interval;
+    public String ticker;
+    public String market;
 
 
     public static final class CandleStickBuilder {
@@ -19,6 +21,8 @@ public class CandleStick {
         private Double high;
         private LocalDateTime date;
         private Long interval;
+        private String ticker;
+        private String market;
 
         private CandleStickBuilder() {
         }
@@ -57,6 +61,16 @@ public class CandleStick {
             return this;
         }
 
+        public CandleStickBuilder withTicker(String ticker) {
+            this.ticker = ticker;
+            return this;
+        }
+
+        public CandleStickBuilder withMarket(String market) {
+            this.market = market;
+            return this;
+        }
+
         public CandleStick build() {
             CandleStick candleStick = new CandleStick();
             candleStick.low = this.low;
@@ -65,6 +79,8 @@ public class CandleStick {
             candleStick.high = this.high;
             candleStick.close = this.close;
             candleStick.interval = this.interval;
+            candleStick.ticker = this.ticker;
+            candleStick.market = this.market;
             return candleStick;
         }
     }
@@ -74,15 +90,16 @@ public class CandleStick {
         Double upperShadow = this.high-this.close;
         Double body = this.close-this.open;
 
-        if (height > open * 0.01 &&
-                upperShadow < height/20 &&
-                body < height*0.3) return true;
+        if (height > open * 0.005 &&
+                upperShadow < height/15 &&
+                body < height*0.20) return true;
         else return false;
 
     }
 
     @Override
     public String toString() {
-        return this.date+","+this.open+","+this.high+","+this.low+","+this.close+","+isHammer();
+        return "ticker = [" + this.ticker + "], market = [" + this.market + "] "+
+                this.date+", o="+this.open+", h="+this.high+", l="+this.low+", c="+this.close+", "+isHammer();
     }
 }
