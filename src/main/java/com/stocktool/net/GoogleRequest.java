@@ -23,13 +23,14 @@ import java.util.stream.Collectors;
 
 public class GoogleRequest {
 
-    final static Long INTERVAL_HALF_HOUR = 1800L;
-    final static Long INTERVAL_HOUR = 3600L;
+    private final static long INTERVAL_HALF_HOUR = 1800L;
+    private final static long INTERVAL_HOUR = 3600L;
+    private final static String GOOGLE_FINANCES_URL = "https://finance.google.com/finance/getprices";
 
 
     public void getData(String ticker, String market, Long interval) throws Exception {
 
-        URL url = new URL("https://www.google.com/finance/getprices?i="+interval+"&p=4d&f=d,o,h,l,c,v&df=cpct&q="+ticker+"&x="+market);
+        URL url = new URL(GOOGLE_FINANCES_URL+"?i="+interval+"&p=4d&f=d,o,h,l,c,v&df=cpct&q="+ticker+"&x="+market);
         System.out.println("ticker = [" + ticker + "], market = [" + market + "]");
         URLConnection goog = url.openConnection();
         BufferedReader in = new BufferedReader(new InputStreamReader(goog.getInputStream()));
@@ -42,7 +43,7 @@ public class GoogleRequest {
     public CompletableFuture<Void> getDataHttpClient(String ticker, String market, Long interval, AsyncHttpClient asyncHttpClient) throws Exception {
 
         CompletableFuture<Response> f = asyncHttpClient
-                .prepareGet("https://www.google.com/finance/getprices?i="+interval+"&p=4d&f=d,o,h,l,c,v&df=cpct&q="+ticker+"&x="+market)
+                .prepareGet(GOOGLE_FINANCES_URL+"?i="+interval+"&p=4d&f=d,o,h,l,c,v&df=cpct&q="+ticker+"&x="+market)
                 .execute()
                 .toCompletableFuture();
 
@@ -154,15 +155,17 @@ public class GoogleRequest {
                     .map(pair -> {
                                 try {
                                     return getDataHttpClient(pair.split(":")[1],
-                                            pair.split(":")[0], INTERVAL_HOUR, asyncHttpClient);
+                                            pair.split(":")[0], INTERVAL_HALF_HOUR, asyncHttpClient);
                                 } catch (Exception e) {
                                     return CompletableFuture.<Void>completedFuture(null);
                                 }
                             }
 
-                    ).collect(Collectors.<CompletableFuture<Void>>toList());
+                    ).collect(Collectors.toList());
 
             final CompletableFuture <Void> allCompletableFuture = CompletableFuture.allOf(futureList.toArray(new CompletableFuture[futureList.size()]));
+
+            System.out.println("Processed Symbols : "+futureList.size());
 
             allCompletableFuture.join();
 
