@@ -4,7 +4,6 @@ import com.stocktool.model.CandleStick;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.DefaultAsyncHttpClient;
 import org.asynchttpclient.Response;
-import sun.invoke.empty.Empty;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -16,17 +15,20 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutionException;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class GoogleRequest {
 
     private final static long INTERVAL_HALF_HOUR = 1800L;
     private final static long INTERVAL_HOUR = 3600L;
     private final static String GOOGLE_FINANCES_URL = "https://finance.google.com/finance/getprices";
-
+    private static final String FOUR_DAYS = "4d";
+    private final static Logger log = LogManager.getLogger(GoogleRequest.class);
 
     public void getData(String ticker, String market, Long interval) throws Exception {
 
@@ -40,21 +42,27 @@ public class GoogleRequest {
 
     }
 
-    public CompletableFuture<Void> getDataHttpClient(String ticker, String market, Long interval, AsyncHttpClient asyncHttpClient) throws Exception {
+    public CompletableFuture<List<CandleStick>> getCandleSticks(String ticker, String market, Long interval, String period, AsyncHttpClient asyncHttpClient) throws Exception {
 
         CompletableFuture<Response> f = asyncHttpClient
-                .prepareGet(GOOGLE_FINANCES_URL+"?i="+interval+"&p=4d&f=d,o,h,l,c,v&df=cpct&q="+ticker+"&x="+market)
+                .prepareGet(GOOGLE_FINANCES_URL
+                        + "?i=" + interval
+                        + "&p=" + period
+                        + "&f=d,o,h,l,c,v&df=cpct"
+                        + "&q=" + ticker
+                        + "&x=" + market)
                 .execute()
                 .toCompletableFuture();
 
-        return f.thenAccept( response  -> {
+        return f.thenApply( response  -> {
 
+            //System.out.println(response.getUri());
+            log.info(response.getUri().toUrl());
             BufferedReader in = new BufferedReader(new InputStreamReader(response.getResponseBodyAsStream()));
 
             List<CandleStick> candleStickList = getCandleStickList(in, interval, ticker, market);
-            printHammer(candleStickList);
+            return candleStickList;
         });
-
     }
 
     private void printHammer(List<CandleStick> candleStickList) {
@@ -69,7 +77,7 @@ public class GoogleRequest {
                 .lines()
                 .skip(7)
                 .findFirst()
-                .map(i -> getCandleStick(i, interval, null, ticker, market));
+                .map(i -> getCandleStick(i, interval, null, ticker, market).orElse(null));
 
         List<CandleStick> candleStickList = new ArrayList <>();
 
@@ -78,7 +86,8 @@ public class GoogleRequest {
 
             candleStickList.addAll(in
                     .lines()
-                    .map(i -> getCandleStick(i, interval, timeStamp, ticker, market))
+                    .map(i -> getCandleStick(i, interval, timeStamp, ticker, market).orElse(null))
+                    .filter( p -> p != null )
                     .collect(Collectors.toCollection(ArrayList::new)));
 
             candleStickList.add(0, first);
@@ -97,23 +106,25 @@ public class GoogleRequest {
             return timeStamp.plusSeconds(interval*Integer.valueOf(line));
     }
 
-    private CandleStick getCandleStick(String line, Long interval, LocalDateTime timeStamp, String ticker, String market) {
+    private Optional<CandleStick> getCandleStick(String line, Long interval, LocalDateTime timeStamp, String ticker, String market) {
 
         BiFunction<String, Long, CandleStick> mapToCandleStick;
         mapToCandleStick = (l, i) -> {
             String[] p = l.split(",");
-            return CandleStick.CandleStickBuilder.aCandleStick()
-                    .withClose(Double.valueOf(p[1]))
-                    .withHigh(Double.valueOf(p[2]))
-                    .withLow(Double.valueOf(p[3]))
-                    .withOpen(Double.valueOf(p[4]))
-                    .withDate(getCandleStickDateTime(p[0], i, timeStamp))
-                    .withTicker(ticker)
-                    .withMarket(market)
-                    .build();
+            return p.length > 1
+                    ? CandleStick.CandleStickBuilder.aCandleStick()
+                        .withClose(Double.valueOf(p[1]))
+                        .withHigh(Double.valueOf(p[2]))
+                        .withLow(Double.valueOf(p[3]))
+                        .withOpen(Double.valueOf(p[4]))
+                        .withDate(getCandleStickDateTime(p[0], i, timeStamp))
+                        .withTicker(ticker)
+                        .withMarket(market)
+                        .build()
+                    : null;
         };
 
-        return mapToCandleStick.apply(line, interval);
+        return Optional.ofNullable(mapToCandleStick.apply(line, interval));
 
     }
 
@@ -134,7 +145,10 @@ public class GoogleRequest {
         try {
 
             ArrayList<String> ibexStockList = new ArrayList<>(
-                    Arrays.asList("BME:ABE", "BME:ACS", "BME:ACX", "BME:AENA", "BME:AMS", "BME:ANA", "BME:BBVA", "BME:BKT", "BME:CABK", "BME:CLNX", "BME:DIA", "BME:ELE", "BME:ENG", "BME:FCC", "BME:FER", "BME:GAM", "BME:GAS", "BME:GRF", "BME:IAG", "BME:IBE", "BME:ITX", "BME:MAP", "BME:MRL", "BME:MTS", "BME:POP", "BME:REE", "BME:SAB", "BME:SAN", "BME:TEF", "BME:TRE", "BME:VIS"));
+                    Arrays.asList("BME:ABE", "BME:ACS", "BME:ACX", "BME:AENA", "BME:AMS", "BME:ANA", "BME:BBVA", "BME:BKT", "BME:CABK", "BME:CLNX", "BME:DIA", "BME:ELE", "BME:ENG", "BME:FCC", "BME:FER", "BME:GAM", "BME:GAS", "BME:GRF", "BME:IAG", "BME:IBE", "BME:ITX", "BME:MAP", "BME:MRL", "BME:MTS", "BME:REE", "BME:SAB", "BME:SAN", "BME:TEF", "BME:TRE", "BME:VIS"));
+
+            ArrayList<String> euroStockList = new ArrayList<>(
+                    Arrays.asList( "BIT:ISP"));
 
             ArrayList<String> nasdaqStockList = new ArrayList<>(
                     Arrays.asList( "NASD:AAPL", "NASD:AMZN", "NASD:NFLX", "NASD:NVDA", "NASD:TSLA"));
@@ -145,19 +159,20 @@ public class GoogleRequest {
             ArrayList<String> allStockList = new ArrayList<>();
 
             allStockList.addAll(ibexStockList);
+            allStockList.addAll(euroStockList);
             allStockList.addAll(nasdaqStockList);
-            allStockList.addAll(otherStockList);
+            //allStockList.addAll(otherStockList);
 
             AsyncHttpClient asyncHttpClient = new DefaultAsyncHttpClient();
 
-            List<CompletableFuture<Void>> futureList = allStockList
+            List<CompletableFuture<List<CandleStick>>> futureList = allStockList
                     .stream()
-                    .map(pair -> {
+                    .map( pair -> {
                                 try {
-                                    return getDataHttpClient(pair.split(":")[1],
-                                            pair.split(":")[0], INTERVAL_HALF_HOUR, asyncHttpClient);
+                                    return getCandleSticks(pair.split(":")[1],
+                                            pair.split(":")[0], INTERVAL_HALF_HOUR, FOUR_DAYS, asyncHttpClient);
                                 } catch (Exception e) {
-                                    return CompletableFuture.<Void>completedFuture(null);
+                                    return CompletableFuture.<List<CandleStick>>completedFuture(null);
                                 }
                             }
 
@@ -168,6 +183,16 @@ public class GoogleRequest {
             System.out.println("Processed Symbols : "+futureList.size());
 
             allCompletableFuture.join();
+
+            futureList.forEach(f -> {
+                try {
+                    printHammer(f.get());
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (ExecutionException e) {
+                    e.printStackTrace();
+                }
+            });
 
             // close client  //
             asyncHttpClient.close();
@@ -182,7 +207,7 @@ public class GoogleRequest {
         try {
 
             ArrayList<String> ibexStockList = new ArrayList<>(
-                    Arrays.asList("BME:ABE", "BME:ACS", "BME:ACX", "BME:AENA", "BME:AMS", "BME:ANA", "BME:BBVA", "BME:BKT", "BME:CABK", "BME:CLNX", "BME:DIA", "BME:ELE", "BME:ENG", "BME:FCC", "BME:FER", "BME:GAM", "BME:GAS", "BME:GRF", "BME:IAG", "BME:IBE", "BME:ITX", "BME:MAP", "BME:MRL", "BME:MTS", "BME:POP", "BME:REE", "BME:SAB", "BME:SAN", "BME:TEF", "BME:TRE", "BME:VIS"));
+                    Arrays.asList("BME:ABE", "BME:ACS", "BME:ACX", "BME:AENA", "BME:AMS", "BME:ANA", "BME:BBVA", "BME:BKT", "BME:CABK", "BME:CLNX", "BME:DIA", "BME:ELE", "BME:ENG", "BME:FCC", "BME:FER", "BME:GAM", "BME:GAS", "BME:GRF", "BME:IAG", "BME:IBE", "BME:ITX", "BME:MAP", "BME:MRL", "BME:MTS", "BME:REE", "BME:SAB", "BME:SAN", "BME:TEF", "BME:TRE", "BME:VIS"));
 
             ArrayList<String> nasdaqStockList = new ArrayList<>(
                     Arrays.asList( "NASD:AAPL", "NASD:AMZN", "NASD:NFLX", "NASD:NVDA", "NASD:TSLA"));
